@@ -3,90 +3,247 @@
 
 ---
 
-<h1 id="microbiota-analysis-pipeline">Microbiota Analysis Pipeline</h1>
-<p>This repository contains the microbiota analysis pipeline used in the study “The Selective Advantage of the lac Operon for Escherichia coli Is Conditional on Diet and Microbiota Composition” published in Frontiers in Microbiology (<a href="https://doi.org/10.3389/fmicb.2021.709259">https://doi.org/10.3389/fmicb.2021.709259</a>). The pipeline processes and analyzes 16S rRNA sequencing data using QIIME2.</p>
-<h2 id="requirements">Requirements</h2>
-<ul>
-<li>
-<p>QIIME2 (version used in the study: 2020.8)</p>
-</li>
-<li>
-<p>Conda (for environment management)</p>
-</li>
-<li>
-<p>Python (required for QIIME2)</p>
-</li>
-<li>
-<p>FASTQ files (paired-end reads from Illumina sequencing)</p>
-</li>
-</ul>
-<h2 id="data-and-files">Data and Files</h2>
-<ul>
-<li>
-<p>Input: Demultiplexed paired-end FASTQ files</p>
-</li>
-<li>
-<p>Metadata File: A TSV file with sample information (e.g., groups, conditions)</p>
-</li>
-<li>
-<p>Outputs: Diversity metrics</p>
-</li>
-</ul>
-<h2 id="pipeline-workflow">Pipeline Workflow</h2>
-<ol>
-<li>Set up the environment</li>
-</ol>
-<pre class=" language-bash"><code class="prism  language-bash">module load conda
-module load qiime2
-</code></pre>
-<ol start="2">
-<li>Import raw sequencing data</li>
-</ol>
-<pre class=" language-python"><code class="prism  language-python">qiime tools <span class="token keyword">import</span> \
-  <span class="token operator">-</span><span class="token operator">-</span><span class="token builtin">type</span> <span class="token string">'SampleData[PairedEndSequencesWithQuality]'</span> \
-  <span class="token operator">-</span><span class="token operator">-</span><span class="token builtin">input</span><span class="token operator">-</span>path pe<span class="token number">-33</span><span class="token operator">-</span>manifest \
-  <span class="token operator">-</span><span class="token operator">-</span>output<span class="token operator">-</span>path paired<span class="token operator">-</span>end<span class="token operator">-</span>demux<span class="token punctuation">.</span>qza \
-  <span class="token operator">-</span><span class="token operator">-</span><span class="token builtin">input</span><span class="token operator">-</span><span class="token builtin">format</span> PairedEndFastqManifestPhred33
+<h2 id="data-import">Data Import</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime tools <span class="token function">import</span> \
+  --type <span class="token string">'SampleData[PairedEndSequencesWithQuality]'</span> \
+  --input-path pe-33-manifest \
+  --output-path paired-end-demux.qza \
+  --input-format PairedEndFastqManifestPhred33
 
-qiime tools validate paired<span class="token operator">-</span>end<span class="token operator">-</span>demux<span class="token punctuation">.</span>qza
+qiime tools validate paired-end-demux.qza
 </code></pre>
-<ol start="3">
-<li>Quality filtering and denoising (deblur)</li>
-</ol>
-<pre class=" language-python"><code class="prism  language-python">qiime deblur denoise<span class="token operator">-</span>16S \
-  <span class="token operator">-</span><span class="token operator">-</span>i<span class="token operator">-</span>demultiplexed<span class="token operator">-</span>seqs demux<span class="token operator">-</span>joined<span class="token operator">-</span>filtered<span class="token punctuation">.</span>qza \
-  <span class="token operator">-</span><span class="token operator">-</span>p<span class="token operator">-</span>trim<span class="token operator">-</span>length <span class="token number">250</span> \
-  <span class="token operator">-</span><span class="token operator">-</span>p<span class="token operator">-</span>sample<span class="token operator">-</span>stats \
-  <span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>representative<span class="token operator">-</span>sequences rep<span class="token operator">-</span>seqs<span class="token punctuation">.</span>qza \
-  <span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>table table<span class="token punctuation">.</span>qza \
-  <span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>stats deblur<span class="token operator">-</span>stats<span class="token punctuation">.</span>qza
+<h2 id="quality-filtering">Quality Filtering</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime vsearch join-pairs \
+ --p-allowmergestagger \
+  --i-demultiplexed-seqs paired-end-demux.qza \
+  --o-joined-sequences demux-joined.qza
+qiime demux summarize \
+  --i-data demux-joined.qza \
+  --o-visualization demux-joined.qzv
 
-qiime deblur visualize<span class="token operator">-</span>stats \
-  <span class="token operator">-</span><span class="token operator">-</span>i<span class="token operator">-</span>deblur<span class="token operator">-</span>stats deblur<span class="token operator">-</span>stats<span class="token punctuation">.</span>qza \
-  <span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>visualization deblur<span class="token operator">-</span>stats<span class="token punctuation">.</span>qzv
+qiime quality-filter q-score \
+  --i-demux demux-joined.qza \
+  --o-filtered-sequences demux-joined-filtered.qza \
+  --o-filter-stats demux-joined-filter-stats.qza
 </code></pre>
-<ol start="4">
-<li>Diversity Analysis</li>
-</ol>
-<pre class=" language-python"><code class="prism  language-python">qiime diversity core<span class="token operator">-</span>metrics<span class="token operator">-</span>phylogenetic <span class="token operator">-</span><span class="token operator">-</span>i<span class="token operator">-</span>table table<span class="token punctuation">.</span>qza \
-<span class="token operator">-</span><span class="token operator">-</span>i<span class="token operator">-</span>phylogeny rooted<span class="token operator">-</span>tree<span class="token punctuation">.</span>qza <span class="token operator">-</span><span class="token operator">-</span>m<span class="token operator">-</span>metadata<span class="token operator">-</span><span class="token builtin">file</span> metadata<span class="token punctuation">.</span>tsv \
-<span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>rarefied<span class="token operator">-</span>table rarefied<span class="token operator">-</span>table<span class="token punctuation">.</span>qza <span class="token operator">-</span><span class="token operator">-</span>p<span class="token operator">-</span>sampling<span class="token operator">-</span>depth <span class="token punctuation">[</span>depth<span class="token punctuation">]</span> \
-<span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>jaccard<span class="token operator">-</span>distance<span class="token operator">-</span>matrix jaccard<span class="token operator">-</span>dm<span class="token punctuation">.</span>qza \
-<span class="token operator">-</span><span class="token operator">-</span>o<span class="token operator">-</span>unweighted<span class="token operator">-</span>unifrac<span class="token operator">-</span>distance<span class="token operator">-</span>matrix unweighted<span class="token operator">-</span>unifrac<span class="token operator">-</span>dm<span class="token punctuation">.</span>qza
+<h2 id="denoising-with-deblur">Denoising with Deblur</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime deblur denoise-16S \
+  --i-demultiplexed-seqs demux-joined-filtered.qza \
+  --p-trim-length 250 \
+  --p-sample-stats \
+  --o-representative-sequences rep-seqs.qza \
+  --o-table table.qza \
+  --o-stats deblur-stats.qza
+
+qiime deblur visualize-stats \
+  --i-deblur-stats deblur-stats.qza \
+  --o-visualization deblur-stats.qzv
+
+qiime feature-table summarize \
+  --i-table table.qza \
+  --o-visualization table.qzv \
+  --m-sample-metadata-file metadata.tsv
+
+qiime feature-table tabulate-seqs \
+  --i-data rep-seqs.qza \
+  --o-visualization rep-seqs.qzv
 </code></pre>
-<h2 id="outputs">Outputs</h2>
-<ul>
-<li>
-<p>Feature table: table.qza</p>
-</li>
-<li>
-<p>Representative sequences: rep-seqs.qza</p>
-</li>
-<li>
-<p>Diversity metrics: alpha diversity values and beta diversity distance matrices</p>
-</li>
-</ul>
-<h2 id="source">Source</h2>
-<p>This analysis was performed by Rita Melo-Miranda and results in the data presented in:<br>
-Pinto C, Melo-Miranda R, Gordo I and Sousa A (2021) The Selective Advantage of the lac Operon for Escherichia coli Is Conditional on Diet and Microbiota Composition. Front. Microbiol. 12:709259.</p>
+<h2 id="asv-table-generation">ASV Table Generation</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime feature-table relative-frequency \
+  --i-table table.qza \
+  --o-relative-frequency-table collapsed-frequency-filtered-table-ASV-without-decontam.qza 
+
+qiime tools <span class="token function">export</span> \
+  --input-path collapsed-frequency-filtered-table-ASV-without-decontam.qza \
+  --output-path exported-filtered-rel-table-ASV-without-decontam
+
+<span class="token function">cd</span> exported-filtered-rel-table-ASV-without-decontam
+
+biom convert -i feature-table.biom -o otu_table_rel_asv-wo_decontam.tsv --to-tsv --header-key taxonomy
+</code></pre>
+<h1 id="alpha-and-beta-diversity">Alpha and beta diversity</h1>
+<pre class=" language-bash"><code class="prism  language-bash">qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences rep-seqs.qza \
+  --o-alignment aligned-rep-seqs.qza \
+  --o-masked-alignment masked-aligned-rep-seqs.qza \
+  --o-tree unrooted-tree.qza \
+  --o-rooted-tree rooted-tree.qza
+
+qiime diversity alpha-rarefaction \
+  --i-table table.qza \
+  --i-phylogeny rooted-tree.qza \
+  --p-max-depth 30000 \
+  --m-metadata-file metadata.tsv \
+  --o-visualization alpha-rarefaction.qzv
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree.qza \
+  --i-table table.qza \
+  --p-sampling-depth 6468 \
+  --m-metadata-file metadata.tsv \
+  --output-dir core-metrics-results
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/weighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/unweighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/jaccard_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/jaccard-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/bray-curtis-subgroup-significance.qzv \
+  --p-pairwise
+</code></pre>
+<h2 id="filter-sequences-per-timepoint">Filter sequences per timepoint</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file metadata.tsv \
+  --p-where <span class="token string">"[before_or_after_str] IN ('after')"</span> \
+  --o-filtered-table filtered-table-after_str.qza
+
+qiime feature-table filter-seqs \
+ --i-data rep-seqs.qza \
+ --i-table filtered-table-after_str.qza \
+ --o-filtered-data filtered-rep-seqs-after_str.qza
+
+qiime feature-table summarize \
+  --i-table filtered-table-after_str.qza \
+  --o-visualization filtered-table-after_str.qzv \
+  --m-sample-metadata-file metadata.tsv
+</code></pre>
+<h2 id="beta-diversity">Beta diversity</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences filtered-rep-seqs-after_str.qza \
+  --o-alignment aligned-rep-seqs-after_str.qza \
+  --o-masked-alignment masked-aligned-rep-seqs-after_str.qza \
+  --o-tree unrooted-tree-after_str.qza \
+  --o-rooted-tree rooted-tree-after_str.qza
+
+qiime diversity alpha-rarefaction \
+  --i-table filtered-table-after_str.qza \
+  --i-phylogeny rooted-tree-after_str.qza \
+  --p-max-depth 30000 \
+  --m-metadata-file metadata.tsv \
+  --o-visualization alpha-rarefaction-after_str.qzv
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree-after_str.qza \
+  --i-table filtered-table-after_str.qza \
+  --p-sampling-depth 6468 \
+  --m-metadata-file metadata.tsv \
+  --output-dir core-metrics-results
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/weighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/unweighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/jaccard_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/jaccard-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/bray-curtis-subgroup-significance.qzv \
+  --p-pairwise
+</code></pre>
+<h2 id="exclude-sample-y11">Exclude sample Y11</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime feature-table filter-samples \
+  --i-table table.qza \
+  --m-metadata-file metadata.tsv \
+  --p-where <span class="token string">"NOT [mouse-name]='Y11'"</span> \
+  --o-filtered-table filtered-table-without-Y11.qza
+
+qiime feature-table filter-seqs \
+ --i-data rep-seqs.qza \
+ --i-table filtered-table-without-Y11.qza \
+ --o-filtered-data filtered-rep-seqs-without-Y11.qza
+
+qiime feature-table summarize \
+  --i-table filtered-table-without-Y11.qza \
+  --o-visualization filtered-table-without-Y11.qzv \
+  --m-sample-metadata-file metadata.tsv
+</code></pre>
+<h2 id="alpha-and-beta-diversity-no-y11">Alpha and Beta diversity (no Y11)</h2>
+<pre class=" language-bash"><code class="prism  language-bash">qiime phylogeny align-to-tree-mafft-fasttree \
+  --i-sequences filtered-rep-seqs-without-Y11.qza \
+  --o-alignment aligned-rep-seqs-without-Y11.qza \
+  --o-masked-alignment masked-aligned-rep-seqs-without-Y11.qza \
+  --o-tree unrooted-tree-without-Y11.qza \
+  --o-rooted-tree rooted-tree-without-Y11.qza
+
+qiime diversity core-metrics-phylogenetic \
+  --i-phylogeny rooted-tree-without-Y11.qza \
+  --i-table filtered-table-without-Y11.qza \
+  --p-sampling-depth 6468 \
+  --m-metadata-file metadata.tsv \
+  --output-dir core-metrics-results
+
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/weighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/weighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/unweighted_unifrac_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/unweighted-unifrac-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/jaccard_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/jaccard-subgroup-significance.qzv \
+  --p-pairwise
+qiime diversity beta-group-significance \
+  --i-distance-matrix core-metrics-results/bray_curtis_distance_matrix.qza \
+  --m-metadata-file metadata.tsv \
+  --m-metadata-column subgroup \
+  --o-visualization core-metrics-results/bray-curtis-subgroup-significance.qzv \
+  --p-pairwise
+
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/shannon_vector.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization core-metrics-results/shannon-group-significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/faith_pd_vector.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization core-metrics-results/faith-group-significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/evenness_vector.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization core-metrics-results/evenness-group-significance.qzv
+qiime diversity alpha-group-significance \
+  --i-alpha-diversity core-metrics-results/observed_features_vector.qza \
+  --m-metadata-file metadata.tsv \
+  --o-visualization core-metrics-results/observed_features-group-significance.qzv
+</code></pre>
 

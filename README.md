@@ -11,7 +11,7 @@ This repository contains scripts and workflows for microbiota analysis using QII
 -   FASTQ files (paired-end reads from Illumina sequencing)
 -  R (version used in the study: 3.6.3)
 
-## Microbiota Analysis in QIIME2
+### 1. Microbiota Analysis in QIIME2
 
 #### **Workflow Overview**
 
